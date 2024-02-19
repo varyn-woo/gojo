@@ -15,7 +15,7 @@ func HandleSetGame(c *gin.Context) {
 	}
 	var gameConfig state.GameConfig
 	c.BindJSON(&gameConfig)
-	log.Printf("Changing game to %s", gameConfig.Game)
+	log.Printf("changing game to %s", gameConfig.Game)
 	game.ChangeGame(gameConfig.Game)
 	c.JSON(200, game)
 }
