@@ -23,6 +23,7 @@ func GetGameServer() *gin.Engine {
 	// set handlers
 	r.GET("/game_get", handlers.HandleGetGame)
 	r.POST("/game_set", handlers.HandleSetGame)
+	r.POST("/player_add", handlers.HandleAddPlayer)
 
 	return r
 }

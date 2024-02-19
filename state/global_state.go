@@ -4,13 +4,15 @@ import "errors"
 
 type Game struct {
 	Name    string
-	Players []Player
+	Players map[string]*Player
 }
 
 var game *Game
 
 func NewGame() *Game {
-	newGame := Game{}
+	newGame := Game{
+		Players: make(map[string]*Player),
+	}
 	game = &newGame
 	return game
 }
@@ -22,16 +24,16 @@ func GetGame() (*Game, error) {
 	return game, nil
 }
 
-func (g *Game) AddPlayer(player Player) {
-	g.Players = append(g.Players, player)
+func (g *Game) AddPlayer(player *Player) error {
+	if _, ok := g.Players[player.Name]; ok {
+		return errors.New("player already exists")
+	}
+	g.Players[player.Name] = player
+	return nil
 }
 
-func (g *Game) RemovePlayer(player Player) {
-	for i, p := range g.Players {
-		if p.Name == player.Name {
-			g.Players = append(g.Players[:i], g.Players[i+1:]...)
-		}
-	}
+func (g *Game) RemovePlayer(player *Player) {
+	g.Players[player.Name] = nil
 }
 
 func (g *Game) ChangeGame(name string) {

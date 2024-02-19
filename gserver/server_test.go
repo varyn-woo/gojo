@@ -4,9 +4,7 @@ import (
 	"encoding/json"
 	"gojo/gserver"
 	"gojo/state"
-	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -45,7 +43,7 @@ func TestGameServer(t *testing.T) {
 
 func (s *ServerTestSuite) TestGetSetGame() {
 	// make a GET request to /game_get
-	resp, err := s.server.Client().Get(s.server.URL + "/game_get")
+	resp, err := gserverGet(s.server, "/game_get")
 	require.NoError(s.T(), err)
 
 	// check that the response status code is 200 (success)
@@ -57,18 +55,37 @@ func (s *ServerTestSuite) TestGetSetGame() {
 	require.Equal(s.T(), s.game.Players, game.Players)
 
 	// make a POST request to /game_set
-	req, _ := http.NewRequest(
-		"POST",
-		s.server.URL+"/game_set",
-		strings.NewReader(`{"game": "psych"}`),
-	)
-	// set CORS origin header so it doesn't get rejected
-	req.Header.Add("Origin", "test")
-	require.NoError(s.T(), err)
-	resp, _ = s.server.Client().Do(req)
+	resp, _ = gserverPost(s.server, "/game_set", `{"game": "psych"}`)
 
 	// check that the response status code is 200 (success)
 	require.Equal(s.T(), 200, resp.StatusCode)
 	// check that game state has changed to reflect the newly set game
 	require.Equal(s.T(), "psych", s.game.Name)
+}
+
+func (s *ServerTestSuite) TestAddPlayer() {
+	// make a POST request to /player_add
+	resp, err := gserverPost(s.server, "/player_add", `{"name": "player1"}`)
+	require.NoError(s.T(), err)
+
+	// check that the response status code is 200 (success)
+	require.Equal(s.T(), 200, resp.StatusCode)
+	// check that the player was added
+	require.Equal(s.T(), 1, len(s.game.Players))
+	require.Equal(s.T(), "player1", s.game.Players["player1"].Name)
+
+	// add a second player and ensure that they're also there
+	resp, err = gserverPost(s.server, "/player_add", `{"name": "player2"}`)
+	require.NoError(s.T(), err)
+
+	// check that the response status code is 200 (success)
+	require.Equal(s.T(), 200, resp.StatusCode)
+	// check that the player was added
+	require.Equal(s.T(), 2, len(s.game.Players))
+	require.Equal(s.T(), "player2", s.game.Players["player2"].Name)
+
+	// re-add the second player and ensure that we get an error
+	resp, err = gserverPost(s.server, "/player_add", `{"name": "player2"}`)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), 500, resp.StatusCode)
 }

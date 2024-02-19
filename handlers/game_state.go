@@ -28,3 +28,21 @@ func HandleGetGame(c *gin.Context) {
 	}
 	c.JSON(200, game)
 }
+
+func HandleAddPlayer(c *gin.Context) {
+	game, err := state.GetGame()
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	var player state.PlayerConfig
+	c.BindJSON(&player)
+	err = game.AddPlayer(&state.Player{Name: player.Name})
+	if err != nil {
+		log.Printf("adding player: %s failed: %v", player.Name, err)
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	log.Printf("added player: %s", player.Name)
+	c.JSON(200, game)
+}
