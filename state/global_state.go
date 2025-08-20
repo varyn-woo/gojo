@@ -1,10 +1,14 @@
 package state
 
-import "errors"
+import (
+	"errors"
+	"sync"
+)
 
 type Game struct {
 	Name    string
 	Players []Player
+	lock    sync.RWMutex
 }
 
 var game *Game
@@ -23,10 +27,14 @@ func GetGame() (*Game, error) {
 }
 
 func (g *Game) AddPlayer(player Player) {
+	g.lock.Lock()
+	defer g.lock.Unlock()
 	g.Players = append(g.Players, player)
 }
 
 func (g *Game) RemovePlayer(player Player) {
+	g.lock.Lock()
+	defer g.lock.Unlock()
 	for i, p := range g.Players {
 		if p.Name == player.Name {
 			g.Players = append(g.Players[:i], g.Players[i+1:]...)
@@ -36,4 +44,10 @@ func (g *Game) RemovePlayer(player Player) {
 
 func (g *Game) ChangeGame(name string) {
 	g.Name = name
+}
+
+func (g *Game) GetPlayers() []Player {
+	g.lock.RLock()
+	defer g.lock.RUnlock()
+	return g.Players
 }
