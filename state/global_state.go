@@ -2,20 +2,25 @@ package state
 
 import (
 	"errors"
-	api_types "gojo/types"
+	"gojo/gen"
 	"sync"
 )
 
 type Game struct {
-	Name    string
-	Players []api_types.Player
+	host    string // player ID of the host
+	started bool
+	state   *gen.GameState
 	lock    sync.RWMutex
 }
 
 var game *Game
 
 func NewGame() *Game {
-	newGame := Game{}
+	newGame := Game{
+		state: &gen.GameState{
+			CurrentStage: gen.GameStage_AWAITING_PLAYERS,
+		},
+	}
 	game = &newGame
 	return game
 }
@@ -27,37 +32,65 @@ func GetGame() (*Game, error) {
 	return game, nil
 }
 
-func (g *Game) GetGameObj() api_types.GameStateResponse {
+func (g *Game) StartGame() {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	if g.started {
+		return // game already started
+	}
+	g.started = true
+	g.state.CurrentStage = gen.GameStage_COLLECTING_RESPONSES
+}
+
+func (g *Game) GetGameState() *gen.GameState {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
-	return api_types.GameStateResponse{
-		Name:    g.Name,
-		Players: g.Players,
+	return g.state
+}
+
+func (g *Game) AddPlayer(player *gen.Player) {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	if len(g.state.Players) == 0 {
+		g.host = player.Id // set the first player as the host
+	}
+	g.state.Players = append(g.state.Players, player)
+}
+
+func (g *Game) RemovePlayer(player *gen.Player) {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	i := g.getPlayerIndexLocked(player.Id)
+	if i >= 0 {
+		g.state.Players = append(g.state.Players[:i], g.state.Players[i+1:]...)
+		return
 	}
 }
 
-func (g *Game) AddPlayer(player api_types.Player) {
+func (g *Game) UpdatePlayer(player *gen.Player) error {
 	g.lock.Lock()
 	defer g.lock.Unlock()
-	g.Players = append(g.Players, player)
+	i := g.getPlayerIndexLocked(player.Id)
+	if i < 0 {
+		return errors.New("player not found")
+	}
+	g.state.Players[i] = player
+	return nil
 }
 
-func (g *Game) RemovePlayer(player api_types.Player) {
-	g.lock.Lock()
-	defer g.lock.Unlock()
-	for i, p := range g.Players {
-		if p.Name == player.Name {
-			g.Players = append(g.Players[:i], g.Players[i+1:]...)
+// getPlayerIndexLocked gets the index of a player base on their ID.
+// It assumes an appropriate lock has already been taken.
+func (g *Game) getPlayerIndexLocked(playerId string) int {
+	for i, player := range g.state.Players {
+		if player.Id == playerId {
+			return i
 		}
 	}
+	return -1
 }
 
-func (g *Game) ChangeGame(name string) {
-	g.Name = name
-}
-
-func (g *Game) GetPlayers() []api_types.Player {
+func (g *Game) GetPlayers() []*gen.Player {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
-	return g.Players
+	return g.state.Players
 }

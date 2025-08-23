@@ -1,32 +1,24 @@
 package handlers
 
 import (
+	"gojo/gen"
 	"gojo/state"
-	"io"
-
-	"github.com/gin-gonic/gin"
 )
 
-func HandleSetGame(c *gin.Context) {
-	game, err := state.GetGame()
-	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
-		return
+func HandleNewGame() *gen.ServerResponse {
+	game := state.NewGame()
+	return &gen.ServerResponse{
+		Response: &gen.ServerResponse_GameState{
+			GameState: game.GetGameState(),
+		},
 	}
-	gameName, err := io.ReadAll(c.Request.Body)
-	if err != nil {
-		c.JSON(400, gin.H{"error": "invalid game name"})
-		return
-	}
-	game.ChangeGame(string(gameName))
-	c.JSON(200, game.GetGameObj())
 }
 
-func HandleGetGame(c *gin.Context) {
+func HandleStartGame() *gen.ServerResponse {
 	game, err := state.GetGame()
 	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
-		return
+		return MakeErrorResponse(err)
 	}
-	c.JSON(200, game.GetGameObj())
+	game.StartGame()
+	return MakeGameStateResponse()
 }
