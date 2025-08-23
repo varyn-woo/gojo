@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"gojo/state"
+	api_types "gojo/types"
 	"log"
 
 	"github.com/gin-gonic/gin"
@@ -13,11 +14,11 @@ func HandleAddPlayer(c *gin.Context) {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
-	var player state.Player
+	var player api_types.Player
 	c.BindJSON(&player)
 	log.Printf("adding player: %s", player.Name)
 	game.AddPlayer(player)
-	c.JSON(200, game)
+	c.JSON(200, game.GetGameObj())
 }
 
 func HandleRemovePlayer(c *gin.Context) {
@@ -26,11 +27,11 @@ func HandleRemovePlayer(c *gin.Context) {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
-	var player state.Player
+	var player api_types.Player
 	c.BindJSON(&player)
 	log.Printf("removing player: %s", player.Name)
 	game.RemovePlayer(player)
-	c.JSON(200, game)
+	c.JSON(200, game.GetGameObj())
 }
 
 func HandleGetPlayers(c *gin.Context) {

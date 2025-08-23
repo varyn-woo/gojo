@@ -7,32 +7,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type PsychState struct {
-	Questions map[string]string
-	Answers   map[string]string
-}
-
-var currState = PsychState{
+var currState = api_types.PsychStateResponse{
 	Questions: make(map[string]string),
 	Answers:   make(map[string]string),
 }
 var psychLock = sync.RWMutex{}
 
-type PsychTextInputType string
-
-const (
-	PsychTextInputTypeQuestion PsychTextInputType = "question"
-	PsychTextInputTypeAnswer   PsychTextInputType = "answer"
-)
-
-type PsychTextInput struct {
-	Player    string `json:"player"`
-	Text      string `json:"text"`
-	InputType string `json:"inputType"`
-}
-
 func HandleAddPsychTextInput(c *gin.Context) {
-	var input PsychTextInput
+	var input api_types.PsychTextInput
 	c.BindJSON(&input)
 	log.Printf("adding text input: %s from player: %s for type: %s", input.Text, input.Player, input.InputType)
 	if currState.Questions[input.Player] != "" {
@@ -47,9 +29,9 @@ func HandleAddPsychTextInput(c *gin.Context) {
 	psychLock.Lock()
 	defer psychLock.Unlock()
 	switch input.InputType {
-	case string(PsychTextInputTypeQuestion):
+	case string(api_types.PsychTextInputTypeQuestion):
 		currState.Questions[input.Player] = input.Text
-	case string(PsychTextInputTypeAnswer):
+	case string(api_types.PsychTextInputTypeAnswer):
 		currState.Answers[input.Player] = input.Text
 	default:
 		c.JSON(400, gin.H{"error": "invalid input type"})

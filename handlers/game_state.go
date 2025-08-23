@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"gojo/state"
-	"log"
+	"io"
 
 	"github.com/gin-gonic/gin"
 )
@@ -13,11 +13,13 @@ func HandleSetGame(c *gin.Context) {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
-	var gameConfig state.GameConfig
-	c.BindJSON(&gameConfig)
-	log.Printf("changing game to %s", gameConfig.Game)
-	game.ChangeGame(gameConfig.Game)
-	c.JSON(200, game)
+	gameName, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid game name"})
+		return
+	}
+	game.ChangeGame(string(gameName))
+	c.JSON(200, game.GetGameObj())
 }
 
 func HandleGetGame(c *gin.Context) {
@@ -26,5 +28,5 @@ func HandleGetGame(c *gin.Context) {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(200, game)
+	c.JSON(200, game.GetGameObj())
 }

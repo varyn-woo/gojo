@@ -1,0 +1,3 @@
+[submodule "ducksu-protos"]
+	path = ducksu-protos
+	url = git@github.com:varyn-woo/ducksu-protos.git
