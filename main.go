@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -10,6 +9,7 @@ import (
 	"gojo/handlers"
 
 	"github.com/gorilla/websocket"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -46,19 +46,13 @@ func (wsh webSocketHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer c.Close()
 
 	for {
-		mt, message, err := c.ReadMessage()
+		_, message, err := c.ReadMessage()
 		if err != nil {
 			log.Printf("Error %s when reading message from client", err)
 			return
 		}
-		if mt == websocket.BinaryMessage {
-			err = c.WriteMessage(websocket.TextMessage, []byte("server doesn't support binary messages"))
-			handleWriteErr(err)
-			return
-		}
-		log.Printf("Receive message %s", string(message))
 		var input gen.UserInputRequest
-		err = json.Unmarshal(message, &input)
+		err = proto.Unmarshal(message, &input)
 		if err != nil {
 			log.Printf("Error %s when unmarshalling message from client", err)
 			err = c.WriteMessage(websocket.TextMessage, []byte("Invalid input format"))
@@ -68,14 +62,15 @@ func (wsh webSocketHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		// send user input to input handlers to get a response obj
 		resp := handlers.RouteUserInput(&input)
-		respJson, err := json.Marshal(resp)
+		respBytes, err := proto.Marshal(resp)
 		if err != nil {
 			log.Printf("Error %s when marshalling response to client", err)
 			err = c.WriteMessage(websocket.TextMessage, []byte("Error processing request"))
 			handleWriteErr(err)
+			continue
 		}
 		// send successful response obj
-		err = c.WriteMessage(websocket.TextMessage, respJson)
+		err = c.WriteMessage(websocket.BinaryMessage, respBytes)
 		handleWriteErr(err)
 	}
 
@@ -83,11 +78,12 @@ func (wsh webSocketHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	webSocketHandler := webSocketHandler{
-		upgrader: websocket.Upgrader{},
+		upgrader: websocket.Upgrader{
+			CheckOrigin: func(_ *http.Request) bool { return true },
+		},
 	}
 
 	http.Handle("/", webSocketHandler)
 	log.Print("Starting server...")
 	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%s", serverIP, serverPort), nil))
-
 }
