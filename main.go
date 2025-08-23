@@ -57,7 +57,7 @@ func (wsh webSocketHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		log.Printf("Receive message %s", string(message))
-		var input gen.UserInput
+		var input gen.UserInputRequest
 		err = json.Unmarshal(message, &input)
 		if err != nil {
 			log.Printf("Error %s when unmarshalling message from client", err)

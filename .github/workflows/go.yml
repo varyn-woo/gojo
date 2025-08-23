@@ -14,12 +14,22 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
 
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
         go-version: '1.24'
+
+    - name: Setup Buf CLI
+      uses: bufbuild/buf-setup-action@v1 # Installs the Buf CLI
+      with:
+        version: 'latest' # Or a specific version like '1.27.0'
+
+    - name: Generate Go code with Buf
+      run: buf generate
 
     - name: Build
       run: go build -v ./...
