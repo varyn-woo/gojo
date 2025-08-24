@@ -7,7 +7,6 @@ import (
 )
 
 type Game struct {
-	host    string // player ID of the host
 	started bool
 	state   *gen.GameState
 	lock    sync.RWMutex
@@ -52,7 +51,7 @@ func (g *Game) AddPlayer(player *gen.Player) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	if len(g.state.Players) == 0 {
-		g.host = player.Id // set the first player as the host
+		g.state.HostPlayerId = player.Id // set the first player as the host
 	}
 	g.state.Players = append(g.state.Players, player)
 }
