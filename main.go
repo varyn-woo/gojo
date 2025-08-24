@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"gojo/gen"
 	"gojo/handlers"
@@ -44,12 +45,45 @@ func (wsh webSocketHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defer c.Close()
+	c.SetPingHandler(func(appData string) error {
+		log.Printf("Received ping from client with appData: %s", appData)
+		err := c.WriteControl(websocket.PongMessage, []byte(appData), time.Now().Add(time.Second))
+		handleWriteErr(err)
+		if err != nil {
+			return err
+		}
+		resp := handlers.MakeGameStateResponse()
+		respBytes, err := proto.Marshal(resp)
+		if err != nil {
+			log.Printf("Error %s when marshalling pong response to client", err)
+			err = c.WriteMessage(websocket.TextMessage, []byte("Error processing request"))
+			handleWriteErr(err)
+			return err
+		}
+		// send successful response obj
+		err = c.WriteMessage(websocket.BinaryMessage, respBytes)
+		handleWriteErr(err)
+		return err
+	})
 
 	for {
-		_, message, err := c.ReadMessage()
+		// read message from client
+		mt, message, err := c.ReadMessage()
 		if err != nil {
 			log.Printf("Error %s when reading message from client", err)
 			return
+		}
+		if mt == websocket.PingMessage {
+			continue
+		}
+		if string(message) == "ping" {
+			c.PingHandler()("ping")
+			continue
+		}
+		if mt != websocket.BinaryMessage {
+			err = c.WriteMessage(websocket.TextMessage, []byte("Only binary messages are supported"))
+			handleWriteErr(err)
+			continue
 		}
 		var input gen.UserInputRequest
 		err = proto.Unmarshal(message, &input)

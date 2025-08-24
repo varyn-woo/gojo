@@ -27,7 +27,7 @@ func NewGame() *Game {
 
 func GetGame() (*Game, error) {
 	if game == nil {
-		return nil, errors.New("game not initialized")
+		return NewGame(), nil
 	}
 	return game, nil
 }
