@@ -5,20 +5,26 @@ import (
 	"gojo/state"
 )
 
-func HandleNewGame() *gen.ServerResponse {
-	game := state.NewGame()
-	return &gen.ServerResponse{
-		Response: &gen.ServerResponse_GameState{
-			GameState: game.GetGameState(),
-		},
-	}
-}
-
-func HandleStartGame() *gen.ServerResponse {
+func handleGameStateChange(updateFunc func(*state.Game)) error {
 	game, err := state.GetGame()
 	if err != nil {
-		return MakeErrorResponse(err)
+		return err
 	}
-	game.StartGame()
-	return MakeGameStateResponse()
+	updateFunc(game)
+	return nil
+}
+
+func HandleNewGame() error {
+	_ = state.NewGame()
+	return nil
+}
+
+func HandleStartGame() error {
+	return handleGameStateChange(func(g *state.Game) { g.StartGame() })
+}
+
+func HandleUserInput(input *gen.UserInputRequest) error {
+	return handleGameStateChange(func(g *state.Game) {
+		g.HandleInput(input)
+	})
 }

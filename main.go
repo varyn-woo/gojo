@@ -81,7 +81,7 @@ func (wsh webSocketHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if mt != websocket.BinaryMessage {
-			err = c.WriteMessage(websocket.TextMessage, []byte("Only binary messages are supported"))
+			err = c.WriteMessage(websocket.TextMessage, []byte("not supported"))
 			handleWriteErr(err)
 			continue
 		}
@@ -94,18 +94,16 @@ func (wsh webSocketHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// send user input to input handlers to get a response obj
-		resp := handlers.RouteUserInput(&input)
-		respBytes, err := proto.Marshal(resp)
+		// send user input to input handlers
+		err = handlers.RouteUserInput(&input)
 		if err != nil {
 			log.Printf("Error %s when marshalling response to client", err)
-			err = c.WriteMessage(websocket.TextMessage, []byte("Error processing request"))
+			resp, rErr := proto.Marshal(handlers.MakeErrorResponse(err))
+			handleWriteErr(rErr)
+			err = c.WriteMessage(websocket.BinaryMessage, resp)
 			handleWriteErr(err)
 			continue
 		}
-		// send successful response obj
-		err = c.WriteMessage(websocket.BinaryMessage, respBytes)
-		handleWriteErr(err)
 	}
 
 }

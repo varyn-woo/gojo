@@ -5,16 +5,16 @@ import (
 	"gojo/state"
 )
 
-func HandleAddPlayer(req *gen.PlayerAddRequest) *gen.ServerResponse {
+func HandleAddPlayer(req *gen.PlayerAddRequest) error {
 	game, err := state.GetGame()
 	if err != nil {
-		return MakeErrorResponse(err)
+		return err
 	}
 	game.AddPlayer(&gen.Player{
-		Id:             req.PlayerId,
-		DisplayName:    req.DisplayName,
-		IsActive:       true,
-		IsPendingInput: false,
+		Id:          req.PlayerId,
+		DisplayName: req.DisplayName,
+		IsActive:    true,
+		IsWaiting:   false,
 	})
-	return MakeAcknowledgementResponse()
+	return nil
 }
