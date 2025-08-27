@@ -13,7 +13,6 @@ type GameHandler interface {
 }
 
 type Game struct {
-	stageStart  time.Time
 	players     map[string]*gen.Player
 	gameHandler GameHandler
 	state       *gen.GameState
@@ -53,17 +52,17 @@ func (g *Game) StartGame() {
 		return // game already started
 	}
 	g.state.Started = true
-	g.stageStart = time.Now()
+	g.state.TimerStart = time.Now()
 	g.lock.Unlock()
 	g.gameHandler.Sync()
 }
 
 func (g *Game) ResetTimer() {
-	g.stageStart = time.Now()
+	g.state.TimerStart = time.Now()
 }
 
 func (g *Game) GetElapsedTime() time.Duration {
-	return time.Since(g.stageStart)
+	return time.Since(g.state.TimerStart)
 }
 
 func (g *Game) GetGameState() *gen.GameState {

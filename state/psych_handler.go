@@ -107,9 +107,6 @@ func (p *PsychHandler) runGameStateUpdates() {
 	game.lock.Lock()
 	defer game.lock.Unlock()
 
-	// update time remaining
-	game.state.TimeRemaining = int32(elapsedTime / time.Second)
-
 	switch p.stage {
 	case questionInput:
 		questionField := ui.MakeTextInput("questionField", &gen.TextField{
