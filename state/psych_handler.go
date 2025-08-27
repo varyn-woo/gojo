@@ -103,12 +103,8 @@ func (p *PsychHandler) Sync() error {
 }
 
 func (p *PsychHandler) runGameStateUpdates() {
-	elapsedTime := game.GetElapsedTime()
 	game.lock.Lock()
 	defer game.lock.Unlock()
-
-	// update time remaining
-	game.state.TimeRemaining = int32(elapsedTime / time.Second)
 
 	switch p.stage {
 	case questionInput:
