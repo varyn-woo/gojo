@@ -103,7 +103,6 @@ func (p *PsychHandler) Sync() error {
 }
 
 func (p *PsychHandler) runGameStateUpdates() {
-	elapsedTime := game.GetElapsedTime()
 	game.lock.Lock()
 	defer game.lock.Unlock()
 

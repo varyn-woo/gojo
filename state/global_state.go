@@ -5,6 +5,8 @@ import (
 	"gojo/gen"
 	"sync"
 	"time"
+
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type GameHandler interface {
@@ -52,17 +54,17 @@ func (g *Game) StartGame() {
 		return // game already started
 	}
 	g.state.Started = true
-	g.state.TimerStart = time.Now()
+	g.state.TimerStart = timestamppb.Now()
 	g.lock.Unlock()
 	g.gameHandler.Sync()
 }
 
 func (g *Game) ResetTimer() {
-	g.state.TimerStart = time.Now()
+	g.state.TimerStart = timestamppb.Now()
 }
 
 func (g *Game) GetElapsedTime() time.Duration {
-	return time.Since(g.state.TimerStart)
+	return time.Since(g.state.TimerStart.AsTime())
 }
 
 func (g *Game) GetGameState() *gen.GameState {
