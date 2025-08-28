@@ -9,6 +9,13 @@ func MakeTextInput(id string, textField *gen.TextField) *gen.UiElement {
 	}
 }
 
+func MakeTimer(id string, countdown bool) *gen.UiElement {
+	return &gen.UiElement{
+		Id:      id,
+		Element: &gen.UiElement_CountdownTimer{CountdownTimer: countdown},
+	}
+}
+
 func MakeSimpleText(id string, simpleText string) *gen.UiElement {
 	return &gen.UiElement{
 		Id:      id,

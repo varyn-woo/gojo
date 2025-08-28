@@ -69,6 +69,7 @@ func (wsh webSocketHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for {
 		// read message from client
 		mt, message, err := c.ReadMessage()
+		log.Printf("message: %s", string(message))
 		if err != nil {
 			log.Printf("Error %s when reading message from client", err)
 			return
