@@ -9,6 +9,7 @@ Now that we have more than one person working on this, some basic contribution r
   - Add the link to your PR to the Jira ticket associated with your change. If there is no associated Jira, make one (you should've made it when starting your task, not when finishing it smh).
     - If Jira integration exists, use that instead of linking. But as of writing this on 8/28/2025, it does not.
   - Test it manually by playing a game to make sure everything still works.
+  - Add/edit any appropriate unit tests to confirm the new behavior.
   - If CI tests are up and working, make sure those pass too (ideally it won't even let you merge if they don't).
   - Request a code review from someone else working on the project. If they don't review it in a reasonable amount of time, you can just merge your code at your own peril since this is not a live site yet.
 - Once the site goes live, the rules will change! If this `README` is not updated, just ignore this section for now.
