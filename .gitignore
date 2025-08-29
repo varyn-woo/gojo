@@ -22,3 +22,7 @@ go.work
 
 # Protos
 gen
+
+# certificates
+*.crt
+*.key
