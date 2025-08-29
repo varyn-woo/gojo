@@ -41,7 +41,7 @@ const (
 )
 
 const (
-	DEFAULT_TIMER  = time.Minute * 2
+	DEFAULT_TIMER  = time.Second * 20
 	NEXT_BUTTON_ID = "resultButton"
 )
 
@@ -105,6 +105,7 @@ func (p *PsychHandler) Sync() error {
 func (p *PsychHandler) runGameStateUpdates() {
 	game.lock.Lock()
 	defer game.lock.Unlock()
+	timer := ui.MakeCountdownTimer("timer", true)
 
 	switch p.stage {
 	case questionInput:
@@ -113,7 +114,7 @@ func (p *PsychHandler) runGameStateUpdates() {
 			Placeholder: "What would player choose as their theme song?",
 			InputType:   string(InputTypeQuestion),
 		})
-		game.state.UiElements = []*gen.UiElement{questionField}
+		game.state.UiElements = []*gen.UiElement{questionField, timer}
 	case answerInput:
 		currentQuestion := p.questions[p.questionIndex].Text
 		currentQuestion = strings.Replace(currentQuestion, "player", p.playerSet[p.playerSetIndex], 1)
@@ -123,7 +124,7 @@ func (p *PsychHandler) runGameStateUpdates() {
 			Placeholder: "your answer here",
 			InputType:   string(InputTypeAnswer),
 		})
-		game.state.UiElements = []*gen.UiElement{answerField}
+		game.state.UiElements = []*gen.UiElement{answerField, timer}
 	case voting:
 		currentQuestion := p.questions[p.questionIndex].Text
 		options := make(map[string]string)
@@ -132,7 +133,7 @@ func (p *PsychHandler) runGameStateUpdates() {
 		}
 		questionPrompt := ui.MakeSimpleText("questionPrompt", currentQuestion)
 		votingOptions := ui.MakeVotingOptions("voting", options)
-		game.state.UiElements = []*gen.UiElement{questionPrompt, votingOptions}
+		game.state.UiElements = []*gen.UiElement{questionPrompt, votingOptions, timer}
 	case votingResults:
 		voteList := sortedKeysByValue(p.votes)
 		resultStrings := make([]string, len(voteList))
