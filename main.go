@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"log"
 	"net/http"
@@ -15,7 +16,7 @@ import (
 
 const (
 	serverIP   = "localhost"
-	serverPort = "8080"
+	serverPort = "8443"
 )
 
 // func main() {
@@ -105,7 +106,6 @@ func (wsh webSocketHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 	}
-
 }
 
 func main() {
@@ -115,7 +115,24 @@ func main() {
 		},
 	}
 
-	http.Handle("/", webSocketHandler)
+	mux := http.NewServeMux()
+	mux.Handle("/ws", webSocketHandler)
+	// Serve using TLS
+	certFile := "server.crt"
+	keyFile := "server.key"
+
+	// Optional: custom TLS config
+	tlsConfig := &tls.Config{
+		// MinVersion: tls.VersionTLS12,
+	}
+
+	server := &http.Server{
+		Addr:      fmt.Sprintf("%s:%s", serverIP, serverPort),
+		Handler:   mux,
+		TLSConfig: tlsConfig,
+	}
+
+	fmt.Printf("Secure WebSocket server running at wss://localhost:%s/ws\n", serverPort)
 	log.Print("Starting server...")
-	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%s", serverIP, serverPort), nil))
+	log.Fatal(server.ListenAndServeTLS(certFile, keyFile))
 }
