@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"gojo/gen"
 	"gojo/ui"
+	"log"
 	"math/rand/v2"
 	"sort"
 	"strings"
@@ -45,21 +46,36 @@ const (
 	NEXT_BUTTON_ID = "resultButton"
 )
 
+func NewPsychHandler(timerDuration time.Duration) *PsychHandler {
+	return &PsychHandler{
+		questions:      []*gen.TextInput{},
+		answers:        make(map[string]*gen.TextInput),
+		votes:          make(map[string]int),
+		playerSet:      []string{},
+		playerSetIndex: 0,
+		ready:          0,
+		stage:          questionInput,
+		timerDuration:  timerDuration,
+		questionIndex:  0,
+	}
+}
+
+func (p *PsychHandler) Start() error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.randomizePlayersIfNeeded()
+	game.StartTimer()
+	return nil
+}
+
 func (p *PsychHandler) Sync() error {
 	// update game state params based on Psych specific state
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	timerDone := game.GetElapsedTime() > p.timerDuration
+	p.randomizePlayersIfNeeded()
 	players := game.GetPlayers()
-	if len(p.playerSet) == 0 || p.playerSetIndex >= len(p.playerSet) {
-		// if players haven't been randomized or this randomization is used up, randomize them
-		p.playerSetIndex = 0
-		p.playerSet = make([]string, len(players))
-		rand.Shuffle(len(players), func(i int, j int) {
-			p.playerSet[i] = players[j].DisplayName
-			p.playerSet[j] = players[i].DisplayName
-		})
-	}
+
 	switch p.stage {
 	case questionInput:
 		if timerDone {
@@ -67,7 +83,8 @@ func (p *PsychHandler) Sync() error {
 			p.stage = answerInput
 			p.questionIndex = 0
 			game.EndWait()
-			game.ResetTimer()
+			// start new timer for answer section
+			game.StartTimer()
 		}
 	case answerInput:
 		if len(p.answers) == len(players) {
@@ -78,7 +95,8 @@ func (p *PsychHandler) Sync() error {
 				p.votes[player.Id] = 0
 			}
 			game.EndWait()
-			game.ResetTimer()
+			// start new timer for vote section
+			game.StartTimer()
 		}
 	case voting:
 		// tally up votes and if all votes are in, proceed with summary + winner
@@ -93,6 +111,9 @@ func (p *PsychHandler) Sync() error {
 		}
 		if totalVotes == len(players) {
 			p.stage = votingResults
+			game.EndWait()
+			// stop timer so people can look at results for as long as they like
+			game.StopTimer()
 			game.IncrPlayerScore(winnerId, 1)
 		}
 	case votingResults:
@@ -117,7 +138,9 @@ func (p *PsychHandler) runGameStateUpdates() {
 		game.state.UiElements = []*gen.UiElement{questionField, timer}
 	case answerInput:
 		currentQuestion := p.questions[p.questionIndex].Text
+		// TODO: make input replacement more robust so players with "player" in their name don't get overwritten
 		currentQuestion = strings.Replace(currentQuestion, "player", p.playerSet[p.playerSetIndex], 1)
+		p.questions[p.questionIndex].Text = currentQuestion
 		p.playerSetIndex++
 		answerField := ui.MakeTextInput("answerField", &gen.TextField{
 			Label:       currentQuestion,
@@ -139,7 +162,7 @@ func (p *PsychHandler) runGameStateUpdates() {
 		resultStrings := make([]string, len(voteList))
 		for i, voteStat := range voteList {
 			player := game.players[voteStat.Key]
-			resultStrings[i] = fmt.Sprintf("%s - %d points", player.DisplayName, voteStat.Value)
+			resultStrings[i] = fmt.Sprintf("%s (%s) - %d points", p.answers[player.Id].Text, player.DisplayName, voteStat.Value)
 		}
 		title := ui.MakeSimpleText("resultText", "Voting Results")
 		resultUi := ui.MakeStringList("resultList", resultStrings)
@@ -153,6 +176,7 @@ func (p *PsychHandler) HandleUserInput(input *gen.UserInputRequest) error {
 	defer p.lock.Unlock()
 	switch t := input.Request.(type) {
 	case *gen.UserInputRequest_TextInputRequest:
+		log.Printf("Received text input request: %s", t.TextInputRequest.Text)
 		switch p.stage {
 		case questionInput:
 			if t.TextInputRequest.InputType != string(InputTypeQuestion) {
@@ -164,15 +188,22 @@ func (p *PsychHandler) HandleUserInput(input *gen.UserInputRequest) error {
 				return ErrOutOfSync
 			}
 			p.answers[input.PlayerId] = t.TextInputRequest
+			err := game.SetPlayerWaiting(input.PlayerId, true)
+			if err != nil {
+				log.Printf("error setting player %s: %s", input.PlayerId, err.Error())
+			}
 		}
-		// mark player as waiting since they submitted
-		game.SetPlayerWaiting(input.PlayerId, true)
 	case *gen.UserInputRequest_ButtonPressRequest:
+		log.Printf("Received button press request: %s", t.ButtonPressRequest)
 		if p.stage != votingResults {
 			return ErrOutOfSync
 		}
 		p.ready++
+		game.SetPlayerWaiting(input.PlayerId, true)
 		if p.ready == len(game.players) {
+			// start timer for question mode and end wait
+			game.StartTimer()
+			game.EndWait()
 			// move to next question and clear out the old answers and votes
 			p.questionIndex++
 			p.answers = make(map[string]*gen.TextInput)
@@ -182,16 +213,30 @@ func (p *PsychHandler) HandleUserInput(input *gen.UserInputRequest) error {
 			p.ready = 0
 		}
 	case *gen.UserInputRequest_VoteRequest:
+		log.Printf("Received vote request: %s", t.VoteRequest.TargetId)
 		if p.stage != voting {
 			return ErrOutOfSync
 		}
-		p.votes[input.PlayerId] += int(t.VoteRequest.Rank)
+		p.votes[t.VoteRequest.TargetId] += int(t.VoteRequest.Rank)
 		// mark player as waiting since they submitted
 		game.SetPlayerWaiting(input.PlayerId, true)
 	default:
 		return ErrInvalidInput
 	}
 	return nil
+}
+
+func (p *PsychHandler) randomizePlayersIfNeeded() {
+	players := game.GetPlayers()
+	if len(p.playerSet) < len(players) || p.playerSetIndex >= len(p.playerSet) {
+		// if players haven't been randomized or this randomization is used up, randomize them
+		p.playerSetIndex = 0
+		p.playerSet = make([]string, len(players))
+		rand.Shuffle(len(players), func(i int, j int) {
+			p.playerSet[i] = players[j].DisplayName
+			p.playerSet[j] = players[i].DisplayName
+		})
+	}
 }
 
 func sortedKeysByValue[K comparable](m map[K]int) [](struct {
