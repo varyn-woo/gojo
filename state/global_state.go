@@ -3,6 +3,7 @@ package state
 import (
 	"errors"
 	"gojo/gen"
+	"log"
 	"sync"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 
 type GameHandler interface {
 	Sync() error
+	Start() error
 	HandleUserInput(*gen.UserInputRequest) error
 }
 
@@ -18,6 +20,7 @@ type Game struct {
 	players     map[string]*gen.Player
 	gameHandler GameHandler
 	state       *gen.GameState
+	timerOn     bool
 	lock        sync.RWMutex
 }
 
@@ -32,8 +35,8 @@ var (
 
 func NewGame() *Game {
 	newGame := Game{
-		gameHandler: &PsychHandler{timerDuration: DEFAULT_TIMER},
-		state:       &gen.GameState{},
+		gameHandler: NewPsychHandler(DEFAULT_TIMER),
+		state:       &gen.GameState{TimerDuration: int32(DEFAULT_TIMER.Seconds())},
 		players:     map[string]*gen.Player{},
 	}
 	game = &newGame
@@ -44,6 +47,15 @@ func GetGame() (*Game, error) {
 	if game == nil {
 		return NewGame(), nil
 	}
+
+	// if time is up, update
+	game.lock.RLock()
+	needTimerSync := game.timerOn && game.state.Started && int(game.GetElapsedTime().Seconds()) > int(game.state.TimerDuration)
+	game.lock.RUnlock()
+	if needTimerSync {
+		game.gameHandler.Sync()
+	}
+
 	return game, nil
 }
 
@@ -55,12 +67,21 @@ func (g *Game) StartGame() {
 	}
 	g.state.Started = true
 	g.state.TimerStart = timestamppb.Now()
+	g.syncPlayerListLocked()
 	g.lock.Unlock()
+	g.gameHandler.Start()
 	g.gameHandler.Sync()
 }
 
-func (g *Game) ResetTimer() {
+func (g *Game) StopTimer() {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	g.timerOn = false
+}
+
+func (g *Game) StartTimer() {
 	g.state.TimerStart = timestamppb.Now()
+	g.timerOn = true
 }
 
 func (g *Game) GetElapsedTime() time.Duration {
@@ -82,6 +103,7 @@ func (g *Game) AddPlayer(player *gen.Player) {
 	}
 
 	g.players[player.Id] = player
+
 	g.syncPlayerListLocked()
 }
 
@@ -112,7 +134,9 @@ func (g *Game) SetPlayerWaiting(id string, isWaiting bool) error {
 		return errors.New("player not found")
 	}
 	player.IsWaiting = isWaiting
+	log.Printf("player %s is now waiting: %v", player.DisplayName, player.IsWaiting)
 	g.syncPlayerListLocked()
+	log.Printf("players: %v", g.state.Players)
 	return nil
 }
 
@@ -132,7 +156,7 @@ func (g *Game) syncPlayerListLocked() {
 	for _, player := range g.players {
 		playerList = append(playerList, player)
 	}
-	game.state.Players = playerList
+	g.state.Players = playerList
 }
 
 func (g *Game) GetPlayers() []*gen.Player {

@@ -47,3 +47,10 @@ func MakeSimpleButton(id, label string) *gen.UiElement {
 		Element: &gen.UiElement_SimpleButton{SimpleButton: label},
 	}
 }
+
+func MakeCountdownTimer(id string, countdown bool) *gen.UiElement {
+	return &gen.UiElement{
+		Id:      id,
+		Element: &gen.UiElement_CountdownTimer{CountdownTimer: countdown},
+	}
+}

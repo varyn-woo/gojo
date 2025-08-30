@@ -47,7 +47,6 @@ func (wsh webSocketHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	defer c.Close()
 	c.SetPingHandler(func(appData string) error {
-		log.Printf("Received ping from client with appData: %s", appData)
 		err := c.WriteControl(websocket.PongMessage, []byte(appData), time.Now().Add(time.Second))
 		handleWriteErr(err)
 		if err != nil {
