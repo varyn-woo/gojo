@@ -39,6 +39,7 @@ const (
 	answerInput
 	voting
 	votingResults
+	finalResults
 )
 
 const (
@@ -78,7 +79,7 @@ func (p *PsychHandler) Sync() error {
 
 	switch p.stage {
 	case questionInput:
-		if timerDone {
+		if timerDone && len(p.questions) > 0 {
 			// questions are done collecting, move to answer gathering
 			p.stage = answerInput
 			p.questionIndex = 0
@@ -87,8 +88,8 @@ func (p *PsychHandler) Sync() error {
 			game.StartTimer()
 		}
 	case answerInput:
-		if len(p.answers) == len(players) {
-			// if every player has submitted, move on to voting
+		if len(p.answers) == len(players) || (timerDone && len(p.answers) > 0) {
+			// if every player has submitted or time is up, move on to voting
 			p.stage = voting
 			p.votes = make(map[string]int)
 			for _, player := range players {
@@ -116,8 +117,7 @@ func (p *PsychHandler) Sync() error {
 			game.StopTimer()
 			game.IncrPlayerScore(winnerId, 1)
 		}
-	case votingResults:
-		// do nothing, transition is triggered by User Input
+		// votingResults and finalResults are user input controlled
 	}
 	p.runGameStateUpdates()
 	return nil
@@ -168,6 +168,18 @@ func (p *PsychHandler) runGameStateUpdates() {
 		resultUi := ui.MakeStringList("resultList", resultStrings)
 		nextButton := ui.MakeSimpleButton(NEXT_BUTTON_ID, "Next Round")
 		game.state.UiElements = []*gen.UiElement{title, resultUi, nextButton}
+	case finalResults:
+		sort.Slice(game.state.Players, func(i int, j int) bool {
+			return game.state.Players[i].Score > game.state.Players[j].Score
+		})
+		playerStrings := make([]string, len(game.state.Players))
+		for i, player := range game.state.Players {
+			playerStrings[i] = fmt.Sprintf("%d. %s (%d points)", i+1, player.DisplayName, player.Score)
+		}
+		title := ui.MakeSimpleText("finalText", "Final Results")
+		resultUi := ui.MakeStringList("scoreList", playerStrings)
+		nextButton := ui.MakeSimpleButton(NEXT_BUTTON_ID, "New Game")
+		game.state.UiElements = []*gen.UiElement{title, resultUi, nextButton}
 	}
 }
 
@@ -195,22 +207,38 @@ func (p *PsychHandler) HandleUserInput(input *gen.UserInputRequest) error {
 		}
 	case *gen.UserInputRequest_ButtonPressRequest:
 		log.Printf("Received button press request: %s", t.ButtonPressRequest)
-		if p.stage != votingResults {
+		switch p.stage {
+		case votingResults, finalResults:
+			p.ready++
+			game.SetPlayerWaiting(input.PlayerId, true)
+			if p.ready == len(game.players) {
+				// start timer for question mode and end wait
+				game.StartTimer()
+				game.EndWait()
+				// move to next question and clear out the old answers and votes
+				p.questionIndex++
+				p.answers = make(map[string]*gen.TextInput)
+				p.votes = make(map[string]int)
+				// moving on from voting results page
+				if p.stage == votingResults {
+					if p.questionIndex < len(p.questions) {
+						p.stage = answerInput
+					} else {
+						// if we have finished all questions, move to final results
+						p.stage = finalResults
+					}
+				} else {
+					// if final results, clear everything and go to question input
+					p.stage = questionInput
+					p.questionIndex = 0
+					p.answers = make(map[string]*gen.TextInput)
+					p.questions = []*gen.TextInput{}
+					p.votes = make(map[string]int)
+				}
+				p.ready = 0
+			}
+		default:
 			return ErrOutOfSync
-		}
-		p.ready++
-		game.SetPlayerWaiting(input.PlayerId, true)
-		if p.ready == len(game.players) {
-			// start timer for question mode and end wait
-			game.StartTimer()
-			game.EndWait()
-			// move to next question and clear out the old answers and votes
-			p.questionIndex++
-			p.answers = make(map[string]*gen.TextInput)
-			p.votes = make(map[string]int)
-			// moving on from voting results page
-			p.stage = answerInput
-			p.ready = 0
 		}
 	case *gen.UserInputRequest_VoteRequest:
 		log.Printf("Received vote request: %s", t.VoteRequest.TargetId)
@@ -227,16 +255,22 @@ func (p *PsychHandler) HandleUserInput(input *gen.UserInputRequest) error {
 }
 
 func (p *PsychHandler) randomizePlayersIfNeeded() {
+	log.Printf("randomizing players")
 	players := game.GetPlayers()
 	if len(p.playerSet) < len(players) || p.playerSetIndex >= len(p.playerSet) {
 		// if players haven't been randomized or this randomization is used up, randomize them
 		p.playerSetIndex = 0
 		p.playerSet = make([]string, len(players))
-		rand.Shuffle(len(players), func(i int, j int) {
-			p.playerSet[i] = players[j].DisplayName
-			p.playerSet[j] = players[i].DisplayName
-		})
+		if len(players) == 1 {
+			p.playerSet[0] = players[0].DisplayName
+		} else {
+			rand.Shuffle(len(players), func(i int, j int) {
+				p.playerSet[i] = players[j].DisplayName
+				p.playerSet[j] = players[i].DisplayName
+			})
+		}
 	}
+	log.Printf("PlayerSet: %v, index: %d", p.playerSet, p.playerSetIndex)
 }
 
 func sortedKeysByValue[K comparable](m map[K]int) [](struct {
