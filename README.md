@@ -15,21 +15,37 @@ Now that we have more than one person working on this, some basic contribution r
 - Once the site goes live, the rules will change! If this `README` is not updated, just ignore this section for now.
 
 ## Dependencies
-- [Install Go](https://go.dev/doc/install)
-- Install Gin (HTTP server library) -  `go get github.com/gin-gonic/gin`
-- Generate a certificate and key using `openssl` (certificate filepaths must correpond to the ones in the `ListenAndServeTLS` function in `main.go`):
+1. [Install Go](https://go.dev/doc/install)
+2. [`ducksu-protos`](https://github.com/varyn-woo/ducksu-protos)
+3. Generate a certificate and key using `openssl` (certificate filepaths must correpond to the ones in the `ListenAndServeTLS` function in `main.go`):
 ```shell
 openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 -nodes -subj "/CN=localhost"
 ```
 
 ## Protobufs
-See `ducksu-protos/README.md` for more detailed instructions on setting up protos. If you have done all of the setup there, you should just be able to use:
+If the protobufs are out of sync after the initial submodule setup:
+```shell
+cd ducksu-protos
+git pull
+cd ..
+buf generate
+```
+
+If you made any changes to the protos while working on this repo, make sure to commit your changes and make a pull request in `ducksu-protos`. If you made the most recent changes locally, you only need to generate new protos using:
 ```shell
 buf generate
 ```
-to generate the protos for this project.
 
 Currently, both Glorious Ducksu and Gojo run locally, so they must be run on the same machine to talk to each other. This will (obviously) be fixed as we work on the project.
 
 ## Running the Server
-To run the server, `cd` into the directory, then `go run main.go`. You may need to visit [`https://localhost:8443/ws`](https://localhost:8443/ws) and force your browser to accept the sus self-signed certificate before the game starts working.
+Set up [`glorious-ducksu`](https://github.com/varyn-woo/glorious-ducksu). This way, you can actually run the site and interact with the UI.
+
+
+To run the server, `cd` into the directory, then:
+```shell
+go run main.go
+```
+
+
+You may need to visit [`https://localhost:8443/ws`](https://localhost:8443/ws) and force your browser to accept the sus self-signed certificate before the game starts working.
